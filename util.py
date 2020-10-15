@@ -71,6 +71,11 @@ def build_dataset(config, use_word=False):
         pickle.dump(vocab, open(config.vocab_path, 'wb'))
     print(f'Vocab size: {len(vocab)}')
 
+    def _to_categorical(y, class_num):
+        out = [0] * class_num
+        out[y] = 1
+        return out
+
     def load_dataset(path, pad_size=32):
         contents = []
         with open(path, 'r', encoding='utf-8') as f:
@@ -92,7 +97,7 @@ def build_dataset(config, use_word=False):
                 # word to id
                 for word in token:
                     words_line.append(vocab.get(word, vocab.get(UNK)))
-                contents.append((words_line, int(label), seq_len))
+                contents.append((words_line, _to_categorical(int(label), config.num_classes)))
         return contents
 
     train = load_dataset(config.train_path, config.pad_size)
@@ -110,10 +115,10 @@ class IterDatasetGenerator(object):
         if self.__index >= len(self.__data):
             raise StopIteration
 
-        x, y = self.__data[self.__index][0:2]
+        x, y = self.__data[self.__index][0], self.__data[self.__index][1]
         self.__index += 1
-        x = np.array(x)
-        y = np.array([y])
+        x = np.array(x).astype(np.int32)
+        y = np.array(y).astype(np.float32)
         return (x, y)
 
     def __iter__(self):
@@ -123,10 +128,10 @@ class IterDatasetGenerator(object):
         return len(self.__data)
 
 
-def build_iterator(dataset):
-    dataset_generator = IterDatasetGenerator(dataset)
-    data_iter = ds.GeneratorDataset(
-        dataset_generator, ['data', 'label'], shuffle=False)
+def build_iterator(dataset, batch_size):
+    generator = IterDatasetGenerator(dataset)
+    data_iter = ds.GeneratorDataset(generator, ['data', 'label'], shuffle=False)
+    data_iter = data_iter.batch(batch_size)
     return data_iter
 
 
@@ -140,8 +145,8 @@ def get_time_dif(start_time):
 def load_data(config):
     start = time.time()
     vocab, train_data, dev_data, test_data = build_dataset(config)
-    train_iter = build_iterator(train_data)
-    dev_iter = build_iterator(dev_data)
-    test_iter = build_iterator(test_data)
+    train_iter = build_iterator(train_data, config.batch_size)
+    dev_iter = build_iterator(dev_data, config.batch_size)
+    test_iter = build_iterator(test_data, config.batch_size)
     print('Time usage:{}s'.format(time.time() - start))
     return vocab, train_iter, dev_iter, test_iter

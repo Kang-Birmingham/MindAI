@@ -2,7 +2,6 @@
 import time
 
 import numpy as np
-from sklearn import metrics
 import mindspore.nn as nn
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
@@ -26,4 +25,11 @@ def train(config, net, train_iter):
                       learning_rate=config.learning_rate)
 
     model = Model(net, net_loss, net_opt, metrics={'Accuracy': Accuracy()})
-    model.train(config.num_epochs, train_iter)
+    model.train(config.num_epochs, train_iter, dataset_sink_mode=False)
+    return model
+
+
+def test(model, test_iter):
+    print("============== Starting Testing ==============")
+    acc = model.eval(test_iter, dataset_sink_mode=False)
+    print("============== Accuracy:{} ==============".format(acc))
